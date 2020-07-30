@@ -12,13 +12,24 @@ import (
 //初始化配置文件
 func InitConfig() {
 	buf := &utils.Config{}
-	UnmarshalYaml(fmt.Sprintf("./conf/%s.app.yaml", gin.Mode()), buf)
+	UnmarshalYaml(getConfigFile(), buf)
 	utils.C = buf
 
 	//app解析
 	baseInfo := &utils.Base{}
 	UnmarshalYaml("./conf/app.yaml", baseInfo)
 	utils.C.Base = baseInfo
+}
+
+/**
+获取到配置文件路径
+*/
+func getConfigFile() string {
+	if utils.FileExists("./conf/local.app.yaml") {
+		return "./conf/local.app.yaml"
+	}
+
+	return fmt.Sprintf("./conf/%s.app.yaml", gin.Mode())
 }
 
 func UnmarshalYaml(fileName string, data interface{}) {

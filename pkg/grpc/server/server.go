@@ -11,9 +11,10 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/shinmigo/pb/productpb"
+	"github.com/shinmigo/pb/memberpb"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 func Run() {
@@ -38,7 +39,9 @@ func Run() {
 	}
 
 	//服务
-	productpb.RegisterHelloServiceServer(g, rpc.NewHello())
+	memberpb.RegisterMemberServiceServer(g, rpc.NewMember())
+	// 在gRPC服务器上注册反射服务
+	reflection.Register(g)
 
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGTERM, syscall.SIGINT, syscall.SIGKILL, syscall.SIGHUP, syscall.SIGQUIT)

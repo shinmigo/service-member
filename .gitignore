@@ -1,9 +1,13 @@
 service-member.exe
 service-member.exe*
 service-member
+
 publish.sh
 runtime/*
 debug
+
+conf/local.app.yaml
+
 */.settings/
 */.DS_Store
 .DS_Store
