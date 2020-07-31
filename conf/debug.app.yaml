@@ -15,4 +15,5 @@ etcd:
 
 grpc:
   name: project/member
-  host: 127.0.0.1:5556
+  host:
+  port: 15000
