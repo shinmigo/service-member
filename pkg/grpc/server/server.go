@@ -15,8 +15,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/shinmigo/pb/productpb"
-
 	"github.com/shinmigo/pb/memberpb"
 
 	"google.golang.org/grpc"
@@ -86,7 +84,6 @@ func Run(grpcIsTrue chan bool) {
 
 	//服务
 	memberpb.RegisterMemberServiceServer(g, rpc.NewMember())
-	productpb.RegisterHelloServiceServer(g, rpc.NewHello())
 
 	// 在gRPC服务器上注册反射服务
 	reflection.Register(g)

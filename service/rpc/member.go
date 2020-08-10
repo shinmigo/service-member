@@ -4,6 +4,9 @@ import (
 	"goshop/service-member/model/account"
 	"goshop/service-member/model/member"
 	"goshop/service-member/pkg/db"
+	"goshop/service-member/service/rpc/logic"
+
+	"github.com/shinmigo/pb/basepb"
 
 	"github.com/shinmigo/pb/memberpb"
 	"golang.org/x/net/context"
@@ -18,24 +21,9 @@ func NewMember() *Member {
 
 // 获取会员列表
 func (s *Member) GetList(ctx context.Context, args *memberpb.ListReq) (*memberpb.ListRes, error) {
-
-	data := make([]*memberpb.Member, 0, 32)
-	query := db.Conn.Table(member.GetTableName()).Select(member.GetDetailFields())
-	if len(args.Mobile) > 0 {
-		query = query.Where("mobile = ?", args.Mobile)
-	}
-
-	if args.MemberId > 0 {
-		query = query.Where("member_id = ?", args.MemberId)
-	}
-
-	if args.Status > 0 {
-		query = query.Where("status = ?", args.Status)
-	}
-	err := query.Find(&data).Error
+	data, total, err := member.GetList(args)
 	if err != nil {
 		return nil, err
-
 	}
 
 	for _, item := range data {
@@ -43,13 +31,13 @@ func (s *Member) GetList(ctx context.Context, args *memberpb.ListReq) (*memberpb
 		item.StatusText = member.StatusMap[item.Status]
 	}
 
-	return &memberpb.ListRes{Members: data}, nil
+	return &memberpb.ListRes{Total: total, Members: data}, nil
 }
 
 // 获取详情 TODO 没有记录
-func (s *Member) GetDetail(ctx context.Context, args *memberpb.DetailReq) (*memberpb.Member, error) {
+func (s *Member) GetInfo(ctx context.Context, args *memberpb.InfoReq) (*memberpb.Member, error) {
 	response := &memberpb.Member{}
-	err := db.Conn.Table(member.GetTableName()).Select(member.GetDetailFields()).Where("member_id = ?", args.MemberId).First(response).Error
+	err := db.Conn.Table(member.GetTableName()).Select(member.GetInfoFields()).Where("member_id = ?", args.MemberId).First(response).Error
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +49,8 @@ func (s *Member) GetDetail(ctx context.Context, args *memberpb.DetailReq) (*memb
 }
 
 // 创建会员
-func (s *Member) Create(ctx context.Context, args *memberpb.CreateReq) (*memberpb.Res, error) {
+// TODO 缓存会员账号密码
+func (s *Member) Add(ctx context.Context, args *memberpb.AddReq) (*basepb.AnyRes, error) {
 	var err error
 
 	tr := db.Conn.Begin()
@@ -80,6 +69,11 @@ func (s *Member) Create(ctx context.Context, args *memberpb.CreateReq) (*memberp
 		}
 	}()
 
+	password, err := logic.GeneratePassword(args.Password) // 对密码进行加密， 加密算法：bcrypt
+	if err != nil {
+		return &basepb.AnyRes{State: 1}, err
+	}
+
 	// 创建会员
 	memberData := member.Member{
 		Mobile:        args.Mobile,
@@ -95,15 +89,11 @@ func (s *Member) Create(ctx context.Context, args *memberpb.CreateReq) (*memberp
 		return nil, err
 	}
 
-	//获取新增的会员Id
-	var memberId []uint64
-	tr.Raw("select LAST_INSERT_ID() as id").Pluck("member_id", &memberId)
-
 	accountData := account.Account{
-		MemberId:    memberId[0],
+		MemberId:    memberData.MemberId,
 		AccountName: args.Mobile,
 		Category:    1,
-		Password:    "111111",
+		Password:    password,
 		Status:      args.Status,
 	}
 
@@ -113,11 +103,11 @@ func (s *Member) Create(ctx context.Context, args *memberpb.CreateReq) (*memberp
 
 	tr.Commit()
 
-	return &memberpb.Res{Status: true}, nil
+	return &basepb.AnyRes{State: 1, Id: memberData.MemberId}, nil
 }
 
 // 更新会员
-func (s *Member) Update(ctx context.Context, args *memberpb.UpdateReq) (*memberpb.Res, error) {
+func (s *Member) Edit(ctx context.Context, args *memberpb.EditReq) (*basepb.AnyRes, error) {
 
 	updateValue := map[string]interface{}{
 		"nickname":        args.Nickname,
@@ -132,11 +122,11 @@ func (s *Member) Update(ctx context.Context, args *memberpb.UpdateReq) (*memberp
 		return nil, err
 	}
 
-	return &memberpb.Res{Status: true}, nil
+	return &basepb.AnyRes{State: 1}, nil
 }
 
 // 更新会员状态 status 0 冻结 1 解冻
-func (s *Member) UpdateStatus(ctx context.Context, args *memberpb.UpdateStatusReq) (*memberpb.Res, error) {
+func (s *Member) EditStatus(ctx context.Context, args *memberpb.EditStatusReq) (*basepb.AnyRes, error) {
 
 	updateValue := map[string]interface{}{
 		"status":     args.Status,
@@ -147,5 +137,5 @@ func (s *Member) UpdateStatus(ctx context.Context, args *memberpb.UpdateStatusRe
 		return nil, err
 	}
 
-	return &memberpb.Res{Status: true}, nil
+	return &basepb.AnyRes{State: 1}, nil
 }
