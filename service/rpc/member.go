@@ -1,10 +1,14 @@
 package rpc
 
 import (
+	"fmt"
 	"goshop/service-member/model/account"
 	"goshop/service-member/model/member"
 	"goshop/service-member/pkg/db"
+	"goshop/service-member/pkg/utils"
 	"goshop/service-member/service/rpc/logic"
+
+	"github.com/jinzhu/gorm"
 
 	"github.com/shinmigo/pb/basepb"
 
@@ -39,6 +43,9 @@ func (s *Member) GetInfo(ctx context.Context, args *memberpb.InfoReq) (*memberpb
 	response := &memberpb.Member{}
 	err := db.Conn.Table(member.GetTableName()).Select(member.GetInfoFields()).Where("member_id = ?", args.MemberId).First(response).Error
 	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -98,6 +105,12 @@ func (s *Member) Add(ctx context.Context, args *memberpb.AddReq) (*basepb.AnyRes
 	}
 
 	if err = tr.Table(account.GetTableName()).Create(accountData).Error; err != nil {
+		return nil, err
+	}
+
+	// 提交前判断下客户端是否取消了任务
+	if utils.IsCancelled(ctx) {
+		err = fmt.Errorf("client cancelled ")
 		return nil, err
 	}
 
