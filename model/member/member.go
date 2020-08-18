@@ -12,7 +12,7 @@ var StatusMap map[uint32]string
 func init() {
 	StatusMap = make(map[uint32]string, 2)
 
-	StatusMap[0] = "冻结"
+	StatusMap[2] = "冻结"
 	StatusMap[1] = "正常"
 }
 
