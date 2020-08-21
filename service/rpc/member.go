@@ -2,18 +2,13 @@ package rpc
 
 import (
 	"fmt"
-	"goshop/service-member/model/account"
+	
+	"github.com/shinmigo/pb/basepb"
+	"github.com/shinmigo/pb/memberpb"
+	"golang.org/x/net/context"
 	"goshop/service-member/model/member"
 	"goshop/service-member/pkg/db"
 	"goshop/service-member/pkg/utils"
-	"goshop/service-member/service/rpc/logic"
-
-	"github.com/jinzhu/gorm"
-
-	"github.com/shinmigo/pb/basepb"
-
-	"github.com/shinmigo/pb/memberpb"
-	"golang.org/x/net/context"
 )
 
 type Member struct {
@@ -23,132 +18,148 @@ func NewMember() *Member {
 	return &Member{}
 }
 
-// 获取会员列表
-func (s *Member) GetList(ctx context.Context, args *memberpb.ListReq) (*memberpb.ListRes, error) {
-	data, total, err := member.GetList(args)
-	if err != nil {
+func (s *Member) AddMember(ctx context.Context, req *memberpb.Member) (*basepb.AnyRes, error) {
+	aul := member.Member{
+		Nickname:      req.Nickname,
+		Mobile:        req.Mobile,
+		Name:          req.Name,
+		Gender:        int32(req.Gender),
+		IdCard:        req.IdCard,
+		Birthday:      req.Birthday,
+		Avatar:        req.Avatar,
+		Email:         req.Email,
+		Status:        int32(req.Status),
+		Remark:        req.Remark,
+		MemberLevelId: req.MemberLevelId,
+		Point:         req.Point,
+		Balance:       req.Balance,
+		CreatedBy:     req.AdminId,
+		UpdatedBy:     req.AdminId,
+	}
+	if err := db.Conn.Table(member.GetTableName()).Create(&aul).Error; err != nil {
 		return nil, err
 	}
-
-	for _, item := range data {
-		item.MemberLevelName = "V1"
-		item.StatusText = member.StatusMap[item.Status]
-	}
-
-	return &memberpb.ListRes{Total: total, Members: data}, nil
-}
-
-// 获取详情 TODO 没有记录
-func (s *Member) GetInfo(ctx context.Context, args *memberpb.InfoReq) (*memberpb.Member, error) {
-	response := &memberpb.Member{}
-	err := db.Conn.Table(member.GetTableName()).Select(member.GetInfoFields()).Where("member_id = ?", args.MemberId).First(response).Error
-	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	response.StatusText = member.StatusMap[response.Status]
-	response.MemberLevelName = "V1"
-
-	return response, nil
-}
-
-// 创建会员
-// TODO 缓存会员账号密码
-func (s *Member) Add(ctx context.Context, args *memberpb.AddReq) (*basepb.AnyRes, error) {
-	var err error
-
-	tr := db.Conn.Begin()
-	if tr.Error != nil {
-		return nil, tr.Error
-	}
-
-	defer func() {
-		if r := recover(); r != nil {
-			tr.Rollback()
-			panic(r)
-		}
-
-		if err != nil {
-			tr.Rollback()
-		}
-	}()
-
-	password, err := logic.GeneratePassword(args.Password) // 对密码进行加密， 加密算法：bcrypt
-	if err != nil {
-		return &basepb.AnyRes{State: 1}, err
-	}
-
-	// 创建会员
-	memberData := member.Member{
-		Mobile:        args.Mobile,
-		Nickname:      args.Nickname,
-		Status:        args.Status,
-		MemberLevelId: args.MemberLevelId,
-		Gender:        args.Gender,
-		Birthday:      args.Birthday,
-		CreatedBy:     args.Operator,
-	}
-
-	if err = tr.Table(member.GetTableName()).Create(&memberData).Error; err != nil {
-		return nil, err
-	}
-
-	accountData := account.Account{
-		MemberId:    memberData.MemberId,
-		AccountName: args.Mobile,
-		Category:    1,
-		Password:    password,
-		Status:      args.Status,
-	}
-
-	if err = tr.Table(account.GetTableName()).Create(accountData).Error; err != nil {
-		return nil, err
-	}
-
-	// 提交前判断下客户端是否取消了任务
+	
 	if utils.IsCancelled(ctx) {
-		err = fmt.Errorf("client cancelled ")
-		return nil, err
+		return nil, fmt.Errorf("client cancelled ")
 	}
-
-	tr.Commit()
-
-	return &basepb.AnyRes{State: 1, Id: memberData.MemberId}, nil
+	
+	return &basepb.AnyRes{
+		Id:    aul.MemberId,
+		State: 1,
+	}, nil
 }
 
-// 更新会员
-func (s *Member) Edit(ctx context.Context, args *memberpb.EditReq) (*basepb.AnyRes, error) {
-
-	updateValue := map[string]interface{}{
-		"nickname":        args.Nickname,
-		"mobile":          args.Mobile,
-		"gender":          args.Gender,
-		"birthday":        args.Birthday,
-		"member_level_id": args.MemberLevelId,
-		"updated_by":      args.Operator,
+func (s *Member) EditMember(ctx context.Context, req *memberpb.Member) (*basepb.AnyRes, error) {
+	if _, err := member.GetOneByMemberId(req.MemberId); err != nil {
+		return nil, err
 	}
-	err := db.Conn.Table(member.GetTableName()).Where("member_id = ?", args.MemberId).Update(updateValue).Error
+	
+	aul := map[string]interface{}{
+		"nickname":        req.Nickname,
+		"mobile":          req.Mobile,
+		"name":            req.Name,
+		"gender":          int32(req.Gender),
+		"id_card":         req.IdCard,
+		"birthday":        req.Birthday,
+		"avatar":          req.Avatar,
+		"email":           req.Email,
+		"status":          int32(req.Status),
+		"remark":          req.Remark,
+		"member_level_id": req.MemberLevelId,
+		"point":           req.Point,
+		"balance":         req.Balance,
+		"updated_by":      req.AdminId,
+	}
+	
+	if err := db.Conn.Table(member.GetTableName()).Model(&member.Member{MemberId: req.MemberId}).Updates(aul).Error; err != nil {
+		return nil, err
+	}
+	
+	if utils.IsCancelled(ctx) {
+		return nil, fmt.Errorf("client cancelled ")
+	}
+	
+	return &basepb.AnyRes{
+		Id:    req.MemberId,
+		State: 1,
+	}, nil
+}
+
+func (s *Member) EditMemberStatus(ctx context.Context, req *basepb.EditStatusReq) (*basepb.AnyRes, error) {
+	if _, ok := memberpb.MemberStatus_name[req.Status]; !ok {
+		return nil, fmt.Errorf("params is err")
+	}
+	
+	if _, err := member.GetOneByMemberId(req.Id); err != nil {
+		return nil, err
+	}
+	
+	aul := map[string]interface{}{
+		"status":     memberpb.MemberStatus(req.Status),
+		"updated_by": req.AdminId,
+	}
+	
+	if err := db.Conn.Table(member.GetTableName()).Model(&member.Member{MemberId: req.Id}).Updates(aul).Error; err != nil {
+		return nil, err
+	}
+	
+	if utils.IsCancelled(ctx) {
+		return nil, fmt.Errorf("client cancelled ")
+	}
+	
+	return &basepb.AnyRes{
+		Id:    req.Id,
+		State: 1,
+	}, nil
+}
+
+func (s *Member) GetMemberList(ctx context.Context, req *memberpb.GetMemberReq) (*memberpb.ListMemberRes, error) {
+	var page uint64 = 1
+	if req.Page > 0 {
+		page = req.Page
+	}
+	
+	var pageSize uint64 = 10
+	if req.PageSize > 0 {
+		pageSize = req.PageSize
+	}
+	
+	rows, total, err := member.GetMemberList(req.MemberId, req.Status, req.Mobile, page, pageSize)
 	if err != nil {
 		return nil, err
 	}
-
-	return &basepb.AnyRes{State: 1}, nil
-}
-
-// 更新会员状态 status 0 冻结 1 解冻
-func (s *Member) EditStatus(ctx context.Context, args *memberpb.EditStatusReq) (*basepb.AnyRes, error) {
-
-	updateValue := map[string]interface{}{
-		"status":     args.Status,
-		"updated_by": args.Operator,
+	
+	if utils.IsCancelled(ctx) {
+		return nil, fmt.Errorf("client cancelled ")
 	}
-	err := db.Conn.Table(member.GetTableName()).Where("member_id = ?", args.MemberId).Update(updateValue).Error
-	if err != nil {
-		return nil, err
+	
+	list := make([]*memberpb.MemberDetail, 0, len(rows))
+	for k := range rows {
+		list = append(list, &memberpb.MemberDetail{
+			MemberId:      rows[k].MemberId,
+			Nickname:      rows[k].Nickname,
+			Mobile:        rows[k].Mobile,
+			Name:          rows[k].Name,
+			Gender:        memberpb.MemberGender(rows[k].Gender),
+			IdCard:        rows[k].IdCard,
+			Birthday:      rows[k].Birthday,
+			Avatar:        rows[k].Avatar,
+			Email:         rows[k].Email,
+			Status:        memberpb.MemberStatus(rows[k].Status),
+			Remark:        rows[k].Remark,
+			MemberLevelId: rows[k].MemberLevelId,
+			Point:         rows[k].Point,
+			Balance:       rows[k].Balance,
+			CreatedBy:     rows[k].CreatedBy,
+			UpdatedBy:     rows[k].UpdatedBy,
+			CreatedAt:     rows[k].CreatedAt.Format(utils.TIME_STD_FORMART),
+			UpdatedAt:     rows[k].UpdatedAt.Format(utils.TIME_STD_FORMART),
+		})
 	}
-
-	return &basepb.AnyRes{State: 1}, nil
+	
+	return &memberpb.ListMemberRes{
+		Total:   total,
+		Members: list,
+	}, nil
 }
