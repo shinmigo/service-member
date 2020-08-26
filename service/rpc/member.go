@@ -163,3 +163,34 @@ func (s *Member) GetMemberList(ctx context.Context, req *memberpb.GetMemberReq) 
 		Members: list,
 	}, nil
 }
+
+func (s *Member) GetMemberDetail(ctx context.Context, req *basepb.GetOneReq) (*memberpb.MemberDetail, error) {
+	row, err := member.GetOneByMemberId(req.Id)
+	if err != nil {
+		return nil, err
+	}
+	if utils.IsCancelled(ctx) {
+		return nil, fmt.Errorf("client cancelled ")
+	}
+	
+	return &memberpb.MemberDetail{
+		MemberId:      row.MemberId,
+		Nickname:      row.Nickname,
+		Mobile:        row.Mobile,
+		Name:          row.Name,
+		Gender:        memberpb.MemberGender(row.Gender),
+		IdCard:        row.IdCard,
+		Birthday:      row.Birthday,
+		Avatar:        row.Avatar,
+		Email:         row.Email,
+		Status:        memberpb.MemberStatus(row.Status),
+		Remark:        row.Remark,
+		MemberLevelId: row.MemberLevelId,
+		Point:         row.Point,
+		Balance:       row.Balance,
+		CreatedBy:     row.CreatedBy,
+		UpdatedBy:     row.UpdatedBy,
+		CreatedAt:     row.CreatedAt.Format(utils.TIME_STD_FORMART),
+		UpdatedAt:     row.UpdatedAt.Format(utils.TIME_STD_FORMART),
+	}, nil
+}
