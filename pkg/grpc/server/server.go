@@ -84,6 +84,7 @@ func Run(grpcIsTrue chan bool) {
 
 	//服务
 	memberpb.RegisterMemberServiceServer(g, rpc.NewMember())
+	memberpb.RegisterAddressServiceServer(g, rpc.NewAddress())
 
 	// 在gRPC服务器上注册反射服务
 	reflection.Register(g)
