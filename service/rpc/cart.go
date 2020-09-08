@@ -2,7 +2,6 @@ package rpc
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	
 	"github.com/shinmigo/pb/basepb"
@@ -104,9 +103,9 @@ func (c *Cart) GetCartListByMemberId(ctx context.Context, req *memberpb.ListCart
 	
 	list := make([]*memberpb.CartDetail, 0, len(rows))
 	for k := range rows {
-		temp, _ := json.Marshal(rows[k])
+		temp, _ := jsonLib.Marshal(rows[k])
 		buf := &memberpb.CartDetail{}
-		_ = json.Unmarshal(temp, buf)
+		_ = jsonLib.Unmarshal(temp, buf)
 		
 		list = append(list, buf)
 	}
