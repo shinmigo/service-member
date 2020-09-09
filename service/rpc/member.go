@@ -2,13 +2,14 @@ package rpc
 
 import (
 	"fmt"
-	
-	"github.com/shinmigo/pb/basepb"
-	"github.com/shinmigo/pb/memberpb"
-	"golang.org/x/net/context"
+
 	"goshop/service-member/model/member"
 	"goshop/service-member/pkg/db"
 	"goshop/service-member/pkg/utils"
+
+	"github.com/shinmigo/pb/basepb"
+	"github.com/shinmigo/pb/memberpb"
+	"golang.org/x/net/context"
 )
 
 type Member struct {
@@ -39,11 +40,11 @@ func (s *Member) AddMember(ctx context.Context, req *memberpb.Member) (*basepb.A
 	if err := db.Conn.Table(member.GetTableName()).Create(&aul).Error; err != nil {
 		return nil, err
 	}
-	
+
 	if utils.IsCancelled(ctx) {
 		return nil, fmt.Errorf("client cancelled ")
 	}
-	
+
 	return &basepb.AnyRes{
 		Id:    aul.MemberId,
 		State: 1,
@@ -54,7 +55,7 @@ func (s *Member) EditMember(ctx context.Context, req *memberpb.Member) (*basepb.
 	if _, err := member.GetOneByMemberId(req.MemberId); err != nil {
 		return nil, err
 	}
-	
+
 	aul := map[string]interface{}{
 		"nickname":        req.Nickname,
 		"mobile":          req.Mobile,
@@ -71,15 +72,15 @@ func (s *Member) EditMember(ctx context.Context, req *memberpb.Member) (*basepb.
 		"balance":         req.Balance,
 		"updated_by":      req.AdminId,
 	}
-	
+
 	if err := db.Conn.Table(member.GetTableName()).Model(&member.Member{MemberId: req.MemberId}).Updates(aul).Error; err != nil {
 		return nil, err
 	}
-	
+
 	if utils.IsCancelled(ctx) {
 		return nil, fmt.Errorf("client cancelled ")
 	}
-	
+
 	return &basepb.AnyRes{
 		Id:    req.MemberId,
 		State: 1,
@@ -90,26 +91,22 @@ func (s *Member) EditMemberStatus(ctx context.Context, req *basepb.EditStatusReq
 	if _, ok := memberpb.MemberStatus_name[req.Status]; !ok {
 		return nil, fmt.Errorf("params is err")
 	}
-	
-	if _, err := member.GetOneByMemberId(req.Id); err != nil {
-		return nil, err
-	}
-	
+
 	aul := map[string]interface{}{
 		"status":     memberpb.MemberStatus(req.Status),
 		"updated_by": req.AdminId,
 	}
-	
-	if err := db.Conn.Table(member.GetTableName()).Model(&member.Member{MemberId: req.Id}).Updates(aul).Error; err != nil {
+
+	if err := db.Conn.Table(member.GetTableName()).Where("member_id in (?)", req.Id).Updates(aul).Error; err != nil {
 		return nil, err
 	}
-	
+
 	if utils.IsCancelled(ctx) {
 		return nil, fmt.Errorf("client cancelled ")
 	}
-	
+
 	return &basepb.AnyRes{
-		Id:    req.Id,
+		Id:    req.Id[0],
 		State: 1,
 	}, nil
 }
@@ -119,21 +116,21 @@ func (s *Member) GetMemberList(ctx context.Context, req *memberpb.GetMemberReq) 
 	if req.Page > 0 {
 		page = req.Page
 	}
-	
+
 	var pageSize uint64 = 10
 	if req.PageSize > 0 {
 		pageSize = req.PageSize
 	}
-	
-	rows, total, err := member.GetMemberList(req.MemberId, req.Status, req.Mobile, page, pageSize)
+
+	rows, total, err := member.GetMemberList(req.MemberId, req.Status, req.Mobile, page, pageSize, req.Nickname)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if utils.IsCancelled(ctx) {
 		return nil, fmt.Errorf("client cancelled ")
 	}
-	
+
 	list := make([]*memberpb.MemberDetail, 0, len(rows))
 	for k := range rows {
 		list = append(list, &memberpb.MemberDetail{
@@ -157,7 +154,7 @@ func (s *Member) GetMemberList(ctx context.Context, req *memberpb.GetMemberReq) 
 			UpdatedAt:     rows[k].UpdatedAt.Format(utils.TIME_STD_FORMART),
 		})
 	}
-	
+
 	return &memberpb.ListMemberRes{
 		Total:   total,
 		Members: list,
@@ -172,7 +169,7 @@ func (s *Member) GetMemberDetail(ctx context.Context, req *basepb.GetOneReq) (*m
 	if utils.IsCancelled(ctx) {
 		return nil, fmt.Errorf("client cancelled ")
 	}
-	
+
 	return &memberpb.MemberDetail{
 		MemberId:      row.MemberId,
 		Nickname:      row.Nickname,
