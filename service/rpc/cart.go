@@ -114,18 +114,14 @@ func (c *Cart) GetCartListByMemberId(ctx context.Context, req *memberpb.ListCart
 	}, nil
 }
 
-func (c *Cart) SetCartNums(ctx context.Context, req *memberpb.SetCartNumsReq) (*basepb.AnyRes, error) {
-	row, err := cart.GetOneByCartId(req.CartId)
-	if err != nil {
-		return nil, err
+func (c *Cart) SelectCart(ctx context.Context, req *memberpb.SelectCartReq) (*basepb.AnyRes, error) {
+	if len(req.CartIds) <= 0 {
+		return nil, fmt.Errorf("请选择商品 ")
 	}
 	
-	if row.MemberId != req.MemberId {
-		return nil, fmt.Errorf("找不到购物车，刷新后再试 ")
-	}
-	
-	cartId, err := cart.SetCartNums(row, row.IsSelect, req.Nums, req.IsPlus)
-	if err != nil {
+	if err := db.Conn.Table(cart.GetTableName()).
+		Where("cart_id in (?) and member_id = ?", req.CartIds, req.MemberId).
+		Update("is_select", req.IsSelect).Error; err != nil {
 		return nil, err
 	}
 	
@@ -133,8 +129,9 @@ func (c *Cart) SetCartNums(ctx context.Context, req *memberpb.SetCartNumsReq) (*
 		return nil, fmt.Errorf("client cancelled ")
 	}
 	
+	// 批量更新返回0
 	return &basepb.AnyRes{
-		Id:    cartId,
+		Id:    0,
 		State: 1,
 	}, nil
 }
