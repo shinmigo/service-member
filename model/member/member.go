@@ -2,7 +2,7 @@ package member
 
 import (
 	"fmt"
-	
+
 	"goshop/service-member/pkg/db"
 	"goshop/service-member/pkg/utils"
 )
@@ -51,37 +51,41 @@ func GetOneByMemberId(MemberId uint64) (*Member, error) {
 		Select(GetField()).
 		Where("member_id = ?", MemberId).
 		First(row).Error
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("err: %v", err)
 	}
 	return row, nil
 }
 
-func GetMemberList(memberId uint64, status int32, mobile string, page, pageSize uint64) ([]*Member, uint64, error) {
+func GetMemberList(memberId uint64, status int32, mobile string, page, pageSize uint64, nickname string) ([]*Member, uint64, error) {
 	var total uint64
-	
+
 	rows := make([]*Member, 0, pageSize)
-	
+
 	query := db.Conn.Table(GetTableName()).Select(GetField())
 	if memberId > 0 {
 		query = query.Where("member_id = ?", memberId)
 	}
-	
+
 	if status > 0 {
 		query = query.Where("status = ?", status)
 	}
-	
+
 	if mobile != "" {
 		query = query.Where("mobile = ?", mobile)
 	}
-	
+
+	if len(nickname) > 0 {
+		query = query.Where("nickname like ?", nickname+"%")
+	}
+
 	err := query.Offset((page - 1) * pageSize).Limit(pageSize).Find(&rows).Error
 	if err != nil {
 		return nil, total, err
 	}
-	
+
 	query.Count(&total)
-	
+
 	return rows, total, nil
 }
