@@ -80,7 +80,7 @@ func GetMemberList(memberId uint64, status int32, mobile string, page, pageSize 
 		query = query.Where("nickname like ?", nickname+"%")
 	}
 
-	err := query.Offset((page - 1) * pageSize).Limit(pageSize).Find(&rows).Error
+	err := query.Order("member_id desc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&rows).Error
 	if err != nil {
 		return nil, total, err
 	}
