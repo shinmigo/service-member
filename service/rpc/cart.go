@@ -69,14 +69,23 @@ func (c *Cart) AddCart(ctx context.Context, req *memberpb.AddCartReq) (*basepb.A
 }
 
 func (c *Cart) DelCart(ctx context.Context, req *memberpb.DelCartReq) (*basepb.AnyRes, error) {
-	if len(req.CartIds) <= 0 {
-		return nil, fmt.Errorf("请选择商品 ")
-	}
-	
-	if err := db.Conn.Table(cart.GetTableName()).
-		Where("cart_id in (?) and member_id = ?", req.CartIds, req.MemberId).
-		Delete(cart.Cart{}).Error; err != nil {
-		return nil, err
+	if req.IsAll == 1 {
+		if len(req.CartIds) <= 0 {
+			return nil, fmt.Errorf("请选择商品 ")
+		}
+		
+		if err := db.Conn.Table(cart.GetTableName()).
+			Where("cart_id in (?) and member_id = ?", req.CartIds, req.MemberId).
+			Delete(cart.Cart{}).Error; err != nil {
+			return nil, err
+		}
+	} else {
+		// 清空购物车
+		if err := db.Conn.Table(cart.GetTableName()).
+			Where("member_id = ?", req.CartIds, req.MemberId).
+			Delete(cart.Cart{}).Error; err != nil {
+			return nil, err
+		}
 	}
 	
 	if utils.IsCancelled(ctx) {
@@ -115,14 +124,35 @@ func (c *Cart) GetCartListByMemberId(ctx context.Context, req *memberpb.ListCart
 }
 
 func (c *Cart) SelectCart(ctx context.Context, req *memberpb.SelectCartReq) (*basepb.AnyRes, error) {
-	if len(req.CartIds) <= 0 {
+	total := len(req.SelectCart)
+	if total <= 0 {
 		return nil, fmt.Errorf("请选择商品 ")
 	}
 	
-	if err := db.Conn.Table(cart.GetTableName()).
-		Where("cart_id in (?) and member_id = ?", req.CartIds, req.MemberId).
-		Update("is_select", req.IsSelect).Error; err != nil {
-		return nil, err
+	checkedTrue := make([]uint64, 0, total)
+	checkedFalse := make([]uint64, 0, total)
+	for k := range req.SelectCart {
+		if req.SelectCart[k].IsSelect == memberpb.CartIsSelect_Select {
+			checkedTrue = append(checkedTrue, req.SelectCart[k].CartId)
+		} else {
+			checkedFalse = append(checkedFalse, req.SelectCart[k].CartId)
+		}
+	}
+	
+	if len(checkedTrue) > 0 {
+		if err := db.Conn.Table(cart.GetTableName()).
+			Where("cart_id in (?) and member_id = ?", checkedTrue, req.MemberId).
+			Update("is_select", 1).Error; err != nil {
+			return nil, err
+		}
+	}
+	
+	if len(checkedFalse) > 0 {
+		if err := db.Conn.Table(cart.GetTableName()).
+			Where("cart_id in (?) and member_id = ?", checkedFalse, req.MemberId).
+			Update("is_select", 0).Error; err != nil {
+			return nil, err
+		}
 	}
 	
 	if utils.IsCancelled(ctx) {
