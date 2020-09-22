@@ -69,7 +69,7 @@ func (c *Cart) AddCart(ctx context.Context, req *memberpb.AddCartReq) (*basepb.A
 }
 
 func (c *Cart) DelCart(ctx context.Context, req *memberpb.DelCartReq) (*basepb.AnyRes, error) {
-	if req.IsAll == 1 {
+	if req.IsAll == 0 {
 		if len(req.CartIds) <= 0 {
 			return nil, fmt.Errorf("请选择商品 ")
 		}
@@ -82,7 +82,7 @@ func (c *Cart) DelCart(ctx context.Context, req *memberpb.DelCartReq) (*basepb.A
 	} else {
 		// 清空购物车
 		if err := db.Conn.Table(cart.GetTableName()).
-			Where("member_id = ?", req.CartIds, req.MemberId).
+			Where("member_id = ?", req.MemberId).
 			Delete(cart.Cart{}).Error; err != nil {
 			return nil, err
 		}
