@@ -10,12 +10,10 @@ import (
 type Address struct {
 	AddressId     uint64         `json:"address_id" gorm:"PRIMARY_KEY"`
 	MemberId      uint64         `json:"member_id"`
-	Category      int32          `json:"category"`
 	Name          string         `json:"name"`
 	Mobile        string         `json:"mobile"`
-	Tel           string         `json:"tel"`
-	Postcode      string         `json:"postcode"`
 	AddressDetail string         `json:"address_detail"`
+	RoomNumber    string         `json:"room_number"`
 	CodeProv      uint64         `json:"code_prov"`
 	CodeCity      uint64         `json:"code_city"`
 	CodeCoun      uint64         `json:"code_coun"`
@@ -23,8 +21,6 @@ type Address struct {
 	IsDefault     int32          `json:"is_default"`
 	Longitude     string         `json:"longitude"`
 	Latitude      string         `json:"latitude"`
-	CreatedBy     uint64         `json:"created_by"`
-	UpdatedBy     uint64         `json:"updated_by"`
 	CreatedAt     utils.JSONTime `json:"created_at"`
 	UpdatedAt     utils.JSONTime `json:"updated_at"`
 }
@@ -35,10 +31,9 @@ func GetTableName() string {
 
 func GetField() []string {
 	return []string{
-		"address_id", "member_id", "category", "name", "mobile", "tel", "postcode",
-		"address_detail", "code_prov", "code_city", "code_coun", "code_town",
+		"address_id", "member_id", "name", "mobile", "address_detail", "room_number",
+		"code_prov", "code_city", "code_coun", "code_town",
 		"is_default", "longitude", "latitude",
-		"created_by", "updated_by", "created_at", "updated_at",
 	}
 }
 

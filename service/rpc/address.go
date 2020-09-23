@@ -21,21 +21,17 @@ func NewAddress() *Address {
 func (s *Address) AddAddress(ctx context.Context, req *memberpb.Address) (*basepb.AnyRes, error) {
 	aul := address.Address{
 		MemberId:      req.MemberId,
-		Category:      int32(req.Category),
 		Name:          req.Name,
 		Mobile:        req.Mobile,
-		Tel:           req.Tel,
-		Postcode:      req.Postcode,
 		AddressDetail: req.Address,
 		CodeProv:      req.CodeProv,
 		CodeCity:      req.CodeCity,
 		CodeCoun:      req.CodeCoun,
 		CodeTown:      req.CodeTown,
+		RoomNumber:    req.RoomNumber,
 		IsDefault:     int32(req.IsDefault),
 		Longitude:     req.Longitude,
 		Latitude:      req.Latitude,
-		CreatedBy:     req.AdminId,
-		UpdatedBy:     req.AdminId,
 	}
 	
 	if err := db.Conn.Table(address.GetTableName()).Create(&aul).Error; err != nil {
@@ -66,11 +62,8 @@ func (s *Address) EditAddress(ctx context.Context, req *memberpb.Address) (*base
 	}
 	
 	aul := map[string]interface{}{
-		"category":       int32(req.Category),
 		"name":           req.Name,
 		"mobile":         req.Mobile,
-		"tel":            req.Tel,
-		"postcode":       req.Postcode,
 		"address_detail": req.Address,
 		"code_prov":      req.CodeProv,
 		"code_city":      req.CodeCity,
@@ -79,7 +72,6 @@ func (s *Address) EditAddress(ctx context.Context, req *memberpb.Address) (*base
 		"is_default":     int32(req.IsDefault),
 		"longitude":      req.Longitude,
 		"latitude":       req.Latitude,
-		"updated_by":     req.AdminId,
 	}
 	
 	if err := db.Conn.Table(address.GetTableName()).Model(&address.Address{AddressId: req.AddressId}).Updates(aul).Error; err != nil {
@@ -134,29 +126,12 @@ func (s *Address) GetAddressListByMemberId(ctx context.Context, req *memberpb.Li
 		return nil, fmt.Errorf("client cancelled ")
 	}
 	
-	list := make([]*memberpb.AddressDetail, 0, len(rows))
+	list := make([]*memberpb.Address, 0, len(rows))
 	for k := range rows {
-		list = append(list, &memberpb.AddressDetail{
-			AddressId: rows[k].AddressId,
-			MemberId:  rows[k].MemberId,
-			Category:  memberpb.AddressCategory(rows[k].Category),
-			Name:      rows[k].Name,
-			Mobile:    rows[k].Mobile,
-			Tel:       rows[k].Tel,
-			Postcode:  rows[k].Postcode,
-			Address:   rows[k].AddressDetail,
-			CodeProv:  rows[k].CodeProv,
-			CodeCity:  rows[k].CodeCity,
-			CodeCoun:  rows[k].CodeCoun,
-			CodeTown:  rows[k].CodeTown,
-			IsDefault: memberpb.AddressIsDefault(rows[k].IsDefault),
-			Longitude: rows[k].Longitude,
-			Latitude:  rows[k].Latitude,
-			CreatedBy: rows[k].CreatedBy,
-			UpdatedBy: rows[k].UpdatedBy,
-			CreatedAt: rows[k].CreatedAt.Format(utils.TIME_STD_FORMART),
-			UpdatedAt: rows[k].UpdatedAt.Format(utils.TIME_STD_FORMART),
-		})
+		item, _ := jsonLib.Marshal(rows[k])
+		buf := &memberpb.Address{}
+		_ = jsonLib.Unmarshal(item, buf)
+		list = append(list, buf)
 	}
 	
 	return &memberpb.ListAddressRes{
@@ -165,7 +140,7 @@ func (s *Address) GetAddressListByMemberId(ctx context.Context, req *memberpb.Li
 	}, nil
 }
 
-func (s *Address) GetAddressDetail(ctx context.Context, req *basepb.GetOneReq) (*memberpb.AddressDetail, error) {
+func (s *Address) GetAddressDetail(ctx context.Context, req *basepb.GetOneReq) (*memberpb.Address, error) {
 	row, err := address.GetOneByAddressId(req.Id)
 	if err != nil {
 		return nil, err
@@ -174,25 +149,9 @@ func (s *Address) GetAddressDetail(ctx context.Context, req *basepb.GetOneReq) (
 		return nil, fmt.Errorf("client cancelled ")
 	}
 	
-	return &memberpb.AddressDetail{
-		AddressId: row.AddressId,
-		MemberId:  row.MemberId,
-		Category:  memberpb.AddressCategory(row.Category),
-		Name:      row.Name,
-		Mobile:    row.Mobile,
-		Tel:       row.Tel,
-		Postcode:  row.Postcode,
-		Address:   row.AddressDetail,
-		CodeProv:  row.CodeProv,
-		CodeCity:  row.CodeCity,
-		CodeCoun:  row.CodeCoun,
-		CodeTown:  row.CodeTown,
-		IsDefault: memberpb.AddressIsDefault(row.IsDefault),
-		Longitude: row.Longitude,
-		Latitude:  row.Latitude,
-		CreatedBy: row.CreatedBy,
-		UpdatedBy: row.UpdatedBy,
-		CreatedAt: row.CreatedAt.Format(utils.TIME_STD_FORMART),
-		UpdatedAt: row.UpdatedAt.Format(utils.TIME_STD_FORMART),
-	}, nil
+	item, _ := jsonLib.Marshal(row)
+	buf := &memberpb.Address{}
+	_ = jsonLib.Unmarshal(item, buf)
+	
+	return buf, nil
 }
