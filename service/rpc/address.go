@@ -54,6 +54,10 @@ func (s *Address) EditAddress(ctx context.Context, req *memberpb.Address) (*base
 		return nil, err
 	}
 	
+	if info.MemberId != req.MemberId {
+		return nil, fmt.Errorf("different member")
+	}
+	
 	if req.IsDefault == memberpb.AddressIsDefault_Used {
 		// 把其他的默认设置为0
 		db.Conn.Table(address.GetTableName()).
@@ -65,6 +69,7 @@ func (s *Address) EditAddress(ctx context.Context, req *memberpb.Address) (*base
 		"name":           req.Name,
 		"mobile":         req.Mobile,
 		"address_detail": req.Address,
+		"room_number":    req.RoomNumber,
 		"code_prov":      req.CodeProv,
 		"code_city":      req.CodeCity,
 		"code_coun":      req.CodeCoun,
@@ -131,6 +136,7 @@ func (s *Address) GetAddressListByMemberId(ctx context.Context, req *memberpb.Li
 		item, _ := jsonLib.Marshal(rows[k])
 		buf := &memberpb.Address{}
 		_ = jsonLib.Unmarshal(item, buf)
+		buf.Address = rows[k].AddressDetail
 		list = append(list, buf)
 	}
 	
@@ -152,6 +158,7 @@ func (s *Address) GetAddressDetail(ctx context.Context, req *basepb.GetOneReq) (
 	item, _ := jsonLib.Marshal(row)
 	buf := &memberpb.Address{}
 	_ = jsonLib.Unmarshal(item, buf)
+	buf.Address = row.AddressDetail
 	
 	return buf, nil
 }
