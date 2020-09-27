@@ -65,6 +65,15 @@ func (s *Member) LoginByMobile(ctx context.Context, req *memberpb.MobilePasswdRe
 	return login(row)
 }
 
+func (s *Member) GetMemberForLogin(ctx context.Context, req *memberpb.MemberIdReq) (*memberpb.LoginRes, error) {
+	row, err := member.GetOneByMemberId(req.MemberId)
+	if err != nil {
+		return nil, err
+	}
+	
+	return login(row)
+}
+
 func login(m *member.Member) (*memberpb.LoginRes, error) {
 	if m == nil {
 		return nil, nil
