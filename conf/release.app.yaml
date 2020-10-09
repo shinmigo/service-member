@@ -17,3 +17,8 @@ grpc:
   name: project/member
   host:
   port: 15000
+
+grpcClient:
+  name:
+    shop: project/shop
+  host: xxx

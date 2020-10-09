@@ -3,12 +3,16 @@ package rpc
 import (
 	"context"
 	"fmt"
-	
-	"github.com/shinmigo/pb/basepb"
-	"github.com/shinmigo/pb/memberpb"
 	"goshop/service-member/model/address"
 	"goshop/service-member/pkg/db"
+	"goshop/service-member/pkg/grpc/gclient"
 	"goshop/service-member/pkg/utils"
+	"time"
+
+	"github.com/shinmigo/pb/shoppb"
+
+	"github.com/shinmigo/pb/basepb"
+	"github.com/shinmigo/pb/memberpb"
 )
 
 type Address struct {
@@ -33,15 +37,15 @@ func (s *Address) AddAddress(ctx context.Context, req *memberpb.Address) (*basep
 		Longitude:     req.Longitude,
 		Latitude:      req.Latitude,
 	}
-	
+
 	if err := db.Conn.Table(address.GetTableName()).Create(&aul).Error; err != nil {
 		return nil, err
 	}
-	
+
 	if utils.IsCancelled(ctx) {
 		return nil, fmt.Errorf("client cancelled ")
 	}
-	
+
 	return &basepb.AnyRes{
 		Id:    aul.AddressId,
 		State: 1,
@@ -53,18 +57,18 @@ func (s *Address) EditAddress(ctx context.Context, req *memberpb.Address) (*base
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if info.MemberId != req.MemberId {
 		return nil, fmt.Errorf("different member")
 	}
-	
+
 	if req.IsDefault == memberpb.AddressIsDefault_Used {
 		// 把其他的默认设置为0
 		db.Conn.Table(address.GetTableName()).
 			Where("member_id = ? and is_default = 1", info.MemberId).
 			Update("is_default", 0)
 	}
-	
+
 	aul := map[string]interface{}{
 		"name":           req.Name,
 		"mobile":         req.Mobile,
@@ -78,15 +82,15 @@ func (s *Address) EditAddress(ctx context.Context, req *memberpb.Address) (*base
 		"longitude":      req.Longitude,
 		"latitude":       req.Latitude,
 	}
-	
+
 	if err := db.Conn.Table(address.GetTableName()).Model(&address.Address{AddressId: req.AddressId}).Updates(aul).Error; err != nil {
 		return nil, err
 	}
-	
+
 	if utils.IsCancelled(ctx) {
 		return nil, fmt.Errorf("client cancelled ")
 	}
-	
+
 	return &basepb.AnyRes{
 		Id:    req.AddressId,
 		State: 1,
@@ -97,15 +101,15 @@ func (s *Address) DelAddress(ctx context.Context, req *basepb.DelReq) (*basepb.A
 	if _, err := address.GetOneByAddressId(req.Id); err != nil {
 		return nil, err
 	}
-	
+
 	if err := db.Conn.Table(address.GetTableName()).Delete(&address.Address{AddressId: req.Id}).Error; err != nil {
 		return nil, err
 	}
-	
+
 	if utils.IsCancelled(ctx) {
 		return nil, fmt.Errorf("client cancelled ")
 	}
-	
+
 	return &basepb.AnyRes{
 		Id:    req.Id,
 		State: 1,
@@ -117,7 +121,7 @@ func (s *Address) GetAddressListByMemberId(ctx context.Context, req *memberpb.Li
 	if req.Page > 0 {
 		page = req.Page
 	}
-	
+
 	var pageSize uint64 = 10
 	if req.PageSize > 0 {
 		pageSize = req.PageSize
@@ -126,11 +130,11 @@ func (s *Address) GetAddressListByMemberId(ctx context.Context, req *memberpb.Li
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if utils.IsCancelled(ctx) {
 		return nil, fmt.Errorf("client cancelled ")
 	}
-	
+
 	list := make([]*memberpb.Address, 0, len(rows))
 	for k := range rows {
 		item, _ := jsonLib.Marshal(rows[k])
@@ -139,7 +143,7 @@ func (s *Address) GetAddressListByMemberId(ctx context.Context, req *memberpb.Li
 		buf.Address = rows[k].AddressDetail
 		list = append(list, buf)
 	}
-	
+
 	return &memberpb.ListAddressRes{
 		Total:     total,
 		Addresses: list,
@@ -154,11 +158,37 @@ func (s *Address) GetAddressDetail(ctx context.Context, req *basepb.GetOneReq) (
 	if utils.IsCancelled(ctx) {
 		return nil, fmt.Errorf("client cancelled ")
 	}
-	
+
 	item, _ := jsonLib.Marshal(row)
 	buf := &memberpb.Address{}
 	_ = jsonLib.Unmarshal(item, buf)
 	buf.Address = row.AddressDetail
-	
+
+	reqId := &shoppb.AreaCodeReq{
+		Codes: []uint64{row.CodeCity, row.CodeCoun, row.CodeProv, row.CodeTown},
+	}
+	ctxShop, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	areaRes, err := gclient.ShopAddress.GetAreaNameByCodes(ctxShop, reqId)
+	if err != nil {
+		return nil, err
+	}
+	cancel()
+	if areaRes != nil && len(areaRes.Codes) > 0 {
+		for i := range areaRes.Codes {
+			switch areaRes.Codes[i].Code {
+			case row.CodeProv:
+				buf.ProvName = areaRes.Codes[i].Name
+			case row.CodeCity:
+				buf.CityName = areaRes.Codes[i].Name
+			case row.CodeCoun:
+				buf.CounName = areaRes.Codes[i].Name
+			case row.CodeTown:
+				buf.TownName = areaRes.Codes[i].Name
+			}
+		}
+	}
+
+	fmt.Println(buf)
+
 	return buf, nil
 }

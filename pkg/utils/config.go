@@ -8,6 +8,7 @@ type Config struct {
 	*Mysql
 	*Etcd
 	*Grpc
+	*GrpcClient
 }
 
 type Base struct {
@@ -37,4 +38,9 @@ type Grpc struct {
 	Name string
 	Host string
 	Port int
+}
+
+type GrpcClient struct {
+	Name map[string]string
+	Host string
 }

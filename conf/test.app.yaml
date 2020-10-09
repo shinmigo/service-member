@@ -18,3 +18,8 @@ grpc:
   # host如果指定了端口，那么端口就是固定的，格式可以是：127.0.0.1:5557或:6688, 否则会动态生成
   host:
   port: 15000
+
+grpcClient:
+  name:
+    shop: project/shop
+  host: xxx
