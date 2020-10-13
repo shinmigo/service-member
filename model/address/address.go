@@ -59,7 +59,11 @@ func GetAddressListByMemberId(memberId uint64, page, pageSize uint64) ([]*Addres
 	
 	query := db.Conn.Table(GetTableName()).Select(GetField()).Where("member_id = ?", memberId)
 	
-	err := query.Offset((page - 1) * pageSize).Limit(pageSize).Find(&rows).Error
+	err := query.Offset((page - 1) * pageSize).
+		Limit(pageSize).
+		Order("is_default desc").
+		Order("address_id desc").
+		Find(&rows).Error
 	
 	if err != nil {
 		return nil, total, err
