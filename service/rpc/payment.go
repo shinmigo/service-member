@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strconv"
 	
-	"github.com/shinmigo/pb/basepb"
 	"github.com/shinmigo/pb/memberpb"
 	"github.com/shopspring/decimal"
 	"google.golang.org/grpc/codes"
@@ -24,7 +23,7 @@ func NewPayment() *Payment {
 	return &Payment{}
 }
 
-func (p *Payment) AddPay(ctx context.Context, req *memberpb.ToAdd) (res *basepb.AnyRes, err error) {
+func (p *Payment) AddPay(ctx context.Context, req *memberpb.ToAdd) (res *memberpb.PaymentRes, err error) {
 	if req.Type == 0 {
 		err = fmt.Errorf("支付方式错误！")
 		return
@@ -106,13 +105,14 @@ func (p *Payment) AddPay(ctx context.Context, req *memberpb.ToAdd) (res *basepb.
 		return
 	}
 	
-	return &basepb.AnyRes{
-		Id:    paymentId,
-		State: 1,
+	return &memberpb.PaymentRes{
+		PaymentId: paymentIdStr,
+		State:     1,
+		Money:     moeny,
 	}, nil
 }
 
-func (p *Payment) EditPay(ctx context.Context, req *memberpb.ToEdit) (res *basepb.AnyRes, err error) {
+func (p *Payment) EditPay(ctx context.Context, req *memberpb.ToEdit) (res *memberpb.PaymentRes, err error) {
 	var info *payment.Payment
 	info, err = payment.GetOneByPaymentId(req.PaymentId)
 	if err != nil {
@@ -130,7 +130,7 @@ func (p *Payment) EditPay(ctx context.Context, req *memberpb.ToEdit) (res *basep
 	}
 	
 	aul := payment.Payment{
-		Status:   int32(memberpb.PaymentStatus_PaySuccess),
+		Status:   int32(req.Status),
 		PayedMsg: req.PayedMsg,
 		TradeNo:  req.TradeNo,
 	}
@@ -144,9 +144,9 @@ func (p *Payment) EditPay(ctx context.Context, req *memberpb.ToEdit) (res *basep
 		return
 	}
 	
-	paymentId, _ := strconv.ParseUint(req.PaymentId, 10, 64)
-	return &basepb.AnyRes{
-		Id:    paymentId,
-		State: 1,
+	return &memberpb.PaymentRes{
+		PaymentId: req.PaymentId,
+		State:     1,
+		Money:     info.Money,
 	}, nil
 }
