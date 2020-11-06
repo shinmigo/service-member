@@ -165,3 +165,20 @@ func (c *Cart) SelectCart(ctx context.Context, req *memberpb.SelectCartReq) (*ba
 		State: 1,
 	}, nil
 }
+
+// 获取购物车数量
+func (c *Cart) GetCartCountByMemberId(ctx context.Context, req *memberpb.ListCartReq) (*memberpb.CartCountRes, error) {
+	var total uint64
+	
+	if err := db.Conn.Table(cart.GetTableName()).Where("member_id = ? and is_select = 1", req.MemberId).Count(&total).Error; err != nil {
+		return nil, err
+	}
+	
+	if utils.IsCancelled(ctx) {
+		return nil, fmt.Errorf("client cancelled ")
+	}
+	
+	return &memberpb.CartCountRes{
+		Count: total,
+	}, nil
+}
