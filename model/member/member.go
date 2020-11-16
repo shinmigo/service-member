@@ -3,15 +3,12 @@ package member
 import (
 	"fmt"
 	
-	"github.com/jinzhu/gorm"
-	"golang.org/x/crypto/bcrypt"
 	"goshop/service-member/pkg/db"
 	"goshop/service-member/pkg/utils"
 )
 
 type Member struct {
 	MemberId      uint64         `json:"member_id" gorm:"PRIMARY_KEY"`
-	Password      string         `json:"password"`
 	Nickname      string         `json:"nickname"`
 	Mobile        string         `json:"mobile"`
 	RegisterIp    string         `json:"register_ip"`
@@ -39,19 +36,10 @@ func GetTableName() string {
 
 func GetField() []string {
 	return []string{
-		"member_id", "password", "nickname", "mobile", "register_ip", "name", "gender", "id_card", "birthday",
+		"member_id", "nickname", "mobile", "register_ip", "name", "gender", "id_card", "birthday",
 		"avatar", "email", "status", "last_login_time", "remark", "member_level_id", "point", "balance",
 		"created_by", "updated_by", "created_at", "updated_at",
 	}
-}
-
-func (m *Member) BeforeSave(scope *gorm.Scope) (err error) {
-	if len(m.Password) > 0 {
-		if pw, err := bcrypt.GenerateFromPassword([]byte(m.Password), 0); err == nil {
-			scope.SetColumn("password", pw)
-		}
-	}
-	return
 }
 
 func GetOneByMemberId(MemberId uint64) (*Member, error) {
