@@ -53,39 +53,75 @@ func (s *Member) LoginByMobile(ctx context.Context, req *memberpb.MobileReq) (*m
 	return login(row)
 }
 
-func (s *Member) LoginByThird(ctx context.Context, req *memberpb.LoginThirdReq) (*memberpb.LoginRes, error) {
+func (s *Member) SaveSessionKey(ctx context.Context, req *memberpb.SessionKey) (*memberpb.SessionKey, error) {
 	row, _ := member_third.GetOneByOpenId(req.OpenId, 1)
-	
 	if row != nil {
-		// 已经绑定， 验证手机号码是否更改
+		if len(req.SessionKey) > 0 {
+			row.SessionKey = req.SessionKey
+			db.Conn.Save(&row)
+		}
+		if utils.IsCancelled(ctx) {
+			return nil, fmt.Errorf("client cancelled ")
+		}
+		return &memberpb.SessionKey{
+			OpenId:     row.OpenId,
+			Unionid:    row.Unionid,
+			SessionKey: row.SessionKey,
+		}, nil
+	}
+	
+	// 新增
+	aul := member_third.MemberThird{
+		MemberId:   0,
+		Type:       1,
+		OpenId:     req.OpenId,
+		SessionKey: req.SessionKey,
+		Unionid:    req.Unionid,
+	}
+	if err := db.Conn.Table(member_third.GetTableName()).Create(&aul).Error; err != nil {
+		return nil, err
+	}
+	
+	if utils.IsCancelled(ctx) {
+		return nil, fmt.Errorf("client cancelled ")
+	}
+	return req, nil
+}
+
+func (s *Member) BindMobileForOpenId(ctx context.Context, req *memberpb.BindMobileReq) (*memberpb.LoginRes, error) {
+	row, err := member_third.GetOneByOpenId(req.OpenId, 1)
+	if err != nil {
+		return nil, err
+	}
+	
+	if row.MemberId > 0 {
 		infoForId, _ := member.GetOneByMemberId(row.MemberId)
 		if infoForId.Mobile == req.Mobile {
-			// 返回用户信息
 			return login(infoForId)
 		}
+	}
+	
+	// 更改查询手机号是否注册
+	infoForMobile, _ := member.GetOneByMobile(req.Mobile)
+	if infoForMobile != nil {
+		// 删除多余绑定
+		db.Conn.Table(member_third.GetTableName()).
+			Where("member_id = ?", infoForMobile.MemberId).
+			Delete(&member_third.MemberThird{})
 		
-		// 更改查询手机号是否注册
-		infoForMobile, _ := member.GetOneByMobile(req.Mobile)
-		if infoForMobile != nil {
-			// 删除多余绑定
-			db.Conn.Table(member_third.GetTableName()).
-				Delete(&member_third.MemberThird{MemberId: infoForMobile.MemberId})
-			
-			// 更改微信绑定账号
-			if err := db.Conn.Table(member_third.GetTableName()).
-				Where("id = ?", row.Id).
-				Update("member_id", infoForMobile.MemberId).Error; err != nil {
-				return nil, err
-			}
-			return login(infoForMobile)
+		// 更改微信绑定账号
+		if err := db.Conn.Table(member_third.GetTableName()).
+			Where("id = ?", row.Id).
+			Update("member_id", infoForMobile.MemberId).Error; err != nil {
+			return nil, err
 		}
-		
+		return login(infoForMobile)
+	} else {
 		// 找不到手机，注册新账号
 		aul := member.Member{
 			Mobile: req.Mobile,
 			Status: int32(memberpb.MemberStatus_Normal),
 		}
-		
 		if err := db.Conn.Create(&aul).Error; err != nil {
 			return nil, err
 		}
@@ -97,43 +133,6 @@ func (s *Member) LoginByThird(ctx context.Context, req *memberpb.LoginThirdReq) 
 		}
 		return login(&aul)
 	}
-	
-	// 查询手机号是否注册
-	memberId := uint64(0)
-	newMember := &member.Member{}
-	infoForMobile, _ := member.GetOneByMobile(req.Mobile)
-	if infoForMobile != nil {
-		// 删除多余绑定
-		db.Conn.Table(member_third.GetTableName()).
-			Delete(&member_third.MemberThird{MemberId: infoForMobile.MemberId})
-		
-		memberId = infoForMobile.MemberId
-		newMember = infoForMobile
-	} else {
-		// 找不到手机，注册新账号
-		aul := member.Member{
-			Mobile: req.Mobile,
-			Status: int32(memberpb.MemberStatus_Normal),
-		}
-		
-		if err := db.Conn.Create(&aul).Error; err != nil {
-			return nil, err
-		}
-		
-		memberId = aul.MemberId
-		newMember = &aul
-	}
-	// 新增
-	if err := db.Conn.Table(member_third.GetTableName()).Create(&member_third.MemberThird{
-		MemberId:   memberId,
-		Type:       1,
-		OpenId:     req.OpenId,
-		SessionKey: req.SessionKey,
-		Unionid:    req.Unionid,
-	}).Error; err != nil {
-		return nil, err
-	}
-	return login(newMember)
 }
 
 func (s *Member) GetMemberForLogin(ctx context.Context, req *memberpb.MemberIdReq) (*memberpb.LoginRes, error) {
