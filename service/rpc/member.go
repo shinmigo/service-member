@@ -341,3 +341,21 @@ func (s *Member) GetMemberDetail(ctx context.Context, req *basepb.GetOneReq) (*m
 		UpdatedAt:     row.UpdatedAt.Format(utils.TIME_STD_FORMART),
 	}, nil
 }
+
+func (s *Member) GetMemberOpenid(ctx context.Context, req *memberpb.MemberIdReq) (*memberpb.MemberOpenidRes, error) {
+	row, err := member_third.GetOneByMemberId(req.MemberId, 1)
+	
+	if err != nil {
+		return nil, err
+	}
+	if utils.IsCancelled(ctx) {
+		return nil, fmt.Errorf("client cancelled ")
+	}
+	
+	return &memberpb.MemberOpenidRes{
+		MemberId:   row.MemberId,
+		OpenId:     row.OpenId,
+		SessionKey: row.SessionKey,
+		Unionid:    row.Unionid,
+	}, nil
+}

@@ -43,3 +43,20 @@ func GetOneByOpenId(openId string, typeStr uint32) (*MemberThird, error) {
 	}
 	return row, nil
 }
+
+func GetOneByMemberId(memberId uint64, typeStr uint32) (*MemberThird, error) {
+	if memberId == 0 {
+		return nil, fmt.Errorf("member_id is null")
+	}
+	row := &MemberThird{}
+	err := db.Conn.Table(GetTableName()).
+		Select(GetField()).
+		Where("member_id = ? and type = ?", memberId, typeStr).
+		First(row).Error
+	
+	if err != nil {
+		return nil, fmt.Errorf("err: %v", err)
+	}
+	return row, nil
+}
+
