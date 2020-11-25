@@ -23,6 +23,23 @@ func NewPayment() *Payment {
 	return &Payment{}
 }
 
+func (p *Payment) GetPay(ctx context.Context, req *memberpb.PaymentIdReq) (res *memberpb.PaymentRelList, err error) {
+	rows, err := payment_rel.GetAllByPaymentId(req.PaymentId)
+	if err != nil {
+		return nil, err
+	}
+	
+	list := make([]*memberpb.PaymentParams, 0, len(rows))
+	for k := range rows {
+		item, _ := jsonLib.Marshal(rows[k])
+		buf := &memberpb.PaymentParams{}
+		_ = jsonLib.Unmarshal(item, buf)
+		list = append(list, buf)
+	}
+	
+	return &memberpb.PaymentRelList{List: list}, nil
+}
+
 func (p *Payment) AddPay(ctx context.Context, req *memberpb.ToAdd) (res *memberpb.PaymentRes, err error) {
 	if req.Type == 0 {
 		err = fmt.Errorf("支付方式错误！")
