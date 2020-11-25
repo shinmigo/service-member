@@ -7,12 +7,14 @@ import (
 	"strconv"
 	
 	"github.com/shinmigo/pb/memberpb"
+	"github.com/shinmigo/pb/orderpb"
 	"github.com/shopspring/decimal"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"goshop/service-member/model/payment"
 	"goshop/service-member/model/payment_rel"
 	"goshop/service-member/pkg/db"
+	"goshop/service-member/pkg/grpc/gclient"
 	"goshop/service-member/pkg/utils"
 )
 
@@ -129,21 +131,18 @@ func (p *Payment) AddPay(ctx context.Context, req *memberpb.ToAdd) (res *memberp
 	}, nil
 }
 
-func (p *Payment) EditPay(ctx context.Context, req *memberpb.ToEdit) (res *memberpb.PaymentRes, err error) {
-	var info *payment.Payment
-	info, err = payment.GetOneByPaymentId(req.PaymentId)
+func (p *Payment) EditPay(ctx context.Context, req *memberpb.ToEdit) (*memberpb.PaymentRes, error) {
+	info, err := payment.GetOneByPaymentId(req.PaymentId)
 	if err != nil {
-		return
+		return nil, err
 	}
 	
 	if req.Money != info.Money {
-		err = fmt.Errorf("支付金额不匹配")
-		return
+		return nil, fmt.Errorf("支付金额不匹配")
 	}
 	
 	if info.Status != int32(memberpb.PaymentStatus_Unpaid) {
-		err = fmt.Errorf("支付状态出错")
-		return
+		return nil, fmt.Errorf("支付状态出错")
 	}
 	
 	aul := payment.Payment{
@@ -152,13 +151,33 @@ func (p *Payment) EditPay(ctx context.Context, req *memberpb.ToEdit) (res *membe
 		TradeNo:  req.TradeNo,
 	}
 	
-	if err = db.Conn.Table(payment.GetTableName()).Where("payment_id = ?", req.PaymentId).Updates(aul).Error; err != nil {
-		return
+	if err := db.Conn.Table(payment.GetTableName()).Where("payment_id = ?", req.PaymentId).Updates(aul).Error; err != nil {
+		return nil, err
 	}
 	
+	if req.Status == memberpb.PaymentStatus_PaySuccess { //成功订单触发
+		// TODO处理订单
+		rows, err := payment_rel.GetAllByPaymentId(req.PaymentId)
+		if err != nil {
+			return nil, err
+		}
+		orderIds := make([]uint64, 0, len(rows))
+		for k := range rows {
+			orderId, _ := strconv.ParseUint(rows[k].SourceId, 0, 64)
+			orderIds = append(orderIds, orderId)
+		}
+		
+		r, err := gclient.OrderClient.PayOrder(ctx, &orderpb.PayOrderReq{OrderId: orderIds})
+		if err != nil {
+			return nil, err
+		}
+		
+		if r.State != 1 {
+			return nil, fmt.Errorf("更新订单失败")
+		}
+	}
 	if ctx.Err() == context.Canceled {
-		err = status.Errorf(codes.Canceled, "The client canceled the request")
-		return
+		return nil, status.Errorf(codes.Canceled, "The client canceled the request")
 	}
 	
 	return &memberpb.PaymentRes{

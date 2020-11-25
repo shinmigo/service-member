@@ -22,4 +22,5 @@ grpc:
 grpcClient:
   name:
     shop: project/shop
+    oms: project/order
   host: xxx
